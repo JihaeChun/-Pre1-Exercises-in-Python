@@ -44,6 +44,9 @@ train['Age']=train['Age'].fillna(value=train.Age.mean())
 train['Embarked']=train['Embarked'].fillna(value=train.Embarked.mode())
 train.info()
 
+test['Age']=test['Age'].fillna(value=test.Age.mean())
+test['Embarked']=test['Embarked'].fillna(value=test.Embarked.mode())
+test.info()
 
 # In[255]:
 
@@ -135,14 +138,79 @@ test
 #test2.to_csv("test10.csv",index = False)
 
 
-# In[240]:
+#2.regression model
+import pandas as pd
+import statsmodels.formula.api as sm
+result = sm.ols(formula="Survived ~ Pclass+Sex+Age+SibSp+Embarked", data=train).fit()
+print result.params
+print result.summary()
+result
 
-#second, logistic model
-from sklearn.linear_model import LogisticRegression
-RegModel=LogisticRegression()
-x=train[["Pclass","Sex","Age","SibSp","Parch","Fare","Embarked"]]
-y=array(train.Survived)
-#y=column_or_1d(y,warn=True)
-RegModel=RegModel.fit(x,y)
-#y,x=dmatrices('Survived ~ +Pclass + Sex + Age + SibSp + Parch + Fare + Embarked',train,return_type="dataframe")
 
+def estimate2(row):
+    estimate=1.374612
+    if row.Sex=='male':
+        estimate=estimate-0.500308
+        
+    if row.Embarked=='Q':
+        estimate=estimate-0.002029
+    elif row.Embarked=='S':
+        estimate=estimate-0.071286
+    
+    estimate=estimate-0.181151*row.Pclass
+    
+    estimate=estimate-0.005879*row.Age
+    
+    estimate=estimate-0.043021*row.SibSp
+
+    return estimate
+
+train["Survived_yn2"]  = train.apply(estimate2, axis = 1)
+train[["Survived_yn2","Survived"]]
+train['Survived_yn2'].groupby([train['Survived']]).min()
+
+#3.random forest
+from sklearn.ensemble import RandomForestClassifier
+
+def format1(row):
+    if row.Sex=='female':
+        Sex1=1
+    else :
+        Sex1=0
+    return Sex1
+
+def format2(row):
+    if row.Embarked=='C':
+        Embarked1=1
+    elif row.Embarked=='Q':
+        Embarked1=2
+    else :
+        Embarked1=3
+    return Embarked1
+
+train["Sex1"]  = train.apply(format1, axis = 1)
+train["Embarked1"]  = train.apply(format2, axis = 1)
+
+test["Sex1"]  = test.apply(format1, axis = 1)
+test["Embarked1"]  = test.apply(format2, axis = 1)
+
+cols=['SibSp','Age','Pclass','Embarked1','Sex1'] #',','Embarked''Sex'
+colsRes = ['Survived']
+passenger_id=["PassengerId"]
+
+trainArr = train.as_matrix(cols)
+trainRes = train.as_matrix(colsRes)
+
+randormforest1 = RandomForestClassifier(n_estimators=100)
+randormforest1
+randormforest1.fit(trainArr,trainRes)
+
+testArr = test.as_matrix(cols)
+output=randormforest1.predict(testArr)
+
+test_id = test.as_matrix(passenger_id)
+
+
+test["Survived"]=output
+test_random=test[["PassengerId","Survived"]]
+test_random.to_csv("test_radomforest.csv",index = False)
